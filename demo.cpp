@@ -1,43 +1,50 @@
 #include "HumanMouseMover.h"
+#include <windows.h>
 #include <iostream>
-#include <string>
-#include <cstdlib>
-#include <ctime>
+#include <random>
+#include <chrono>
+#include <thread>
+
+int getScreenWidth() {
+    return GetSystemMetrics(SM_CXSCREEN);
+}
+
+int getScreenHeight() {
+    return GetSystemMetrics(SM_CYSCREEN);
+}
 
 int main() {
-    std::srand((unsigned)std::time(nullptr));
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    int screenW = getScreenWidth();
+    int screenH = getScreenHeight();
+
+    std::uniform_int_distribution<int> xd(0, screenW - 1);
+    std::uniform_int_distribution<int> yd(0, screenH - 1);
+    std::uniform_real_distribution<double> speed_dist(0.4, 1.2);
+    std::uniform_real_distribution<double> curve_dist(0.2, 0.5);
 
     HumanMouseMover mover;
 
-    std::cout << "HumanMouseMover demo - Bézier, random, interruptible\n";
-    std::cout << "Type target X and Y (or 'q' to quit)\n";
+    std::cout << "Demo: Mouse will move to random locations on screen." << std::endl;
+    std::cout << "Press Ctrl+C or close this window to stop.\n" << std::endl;
 
-    for (;;) {
-        std::string line;
-        std::cout << "\nTarget X Y: ";
-        std::getline(std::cin, line);
+    while (true) {
+        int targetX = xd(rng);
+        int targetY = yd(rng);
 
-        if (line.empty() || line[0] == 'q')
-            break;
+        HumanMouseMover::Options opts;
+        opts.duration_sec = speed_dist(rng);   // random duration
+        opts.randomness   = 0.15;              // fixed for realism
+        opts.curve_strength = curve_dist(rng); // random curve
+        opts.updates_per_sec = 120;
 
-        int tx, ty;
+        std::cout << "Moving to: " << targetX << "," << targetY << " (duration " << opts.duration_sec << "s)\n";
+        mover.moveTo(targetX, targetY, opts);
 
-        if (sscanf_s(line.c_str(), "%d %d", &tx, &ty) == 2) {
-            HumanMouseMover::Options opts;
-
-            opts.duration_sec = 0.6 + 0.8 * (std::rand() / double(RAND_MAX));
-            opts.randomness = 0.13;
-            opts.curve_strength = 0.35;
-            opts.updates_per_sec = 120;
-
-            std::cout << "Moving mouse to: " << tx << "," << ty << "\n";
-            mover.moveTo(tx, ty, opts);
-        }
-        else {
-            std::cout << "Parse error. Usage: <x> <y>\n";
-        }
+        // Wait for current move to (mostly) finish
+        std::this_thread::sleep_for(std::chrono::duration<double>(opts.duration_sec + 0.1));
     }
 
-    mover.interrupt();
     return 0;
 }
